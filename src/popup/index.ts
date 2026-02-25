@@ -37,9 +37,11 @@ Alpine.data('popup', () => ({
     this.error = '';
   },
   afterUpdate(event) {
-    console.log('after-update', event.detail);
-    this.filteredAccts = event.detail;
     this.isLoading = false;
+    console.log('after-update', event);
+    if (event.detail) {
+      this.filteredAccts = event.detail;
+    }
   },
   onOpenSettings() {
     this.isLoading = false;

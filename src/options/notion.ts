@@ -41,8 +41,23 @@ export default () => ({
   },
   onCheckBoxChange() {
     this.error = '';
+    const selectedDatabase = (this.databaseList as Database[]).find((db) => db.id === this.$el.value);
+    this.selectedDatabase = selectedDatabase;
+    if (this.selectedDatabase?.properties) {
+      const requiredTypes = ['title', 'date', 'number'];
+      const presentTypes = new Set(
+        (this.selectedDatabase.properties as Array<{ type: string }>).map((prop) => prop.type),
+      );
+      const missing = requiredTypes.filter((type) => !presentTypes.has(type));
+      if (missing.length > 0) {
+        window.dispatchEvent(
+          new CustomEvent('on-notion-error', {
+            detail: `Warning: Database missing required property types: ${missing.join(', ')}`,
+          }),
+        );
+      }
+    }
     this.buttonTitle = 'Save';
-    this.selectedDatabase = (this.databaseList as Database[]).find((db) => db.id === this.$el.value);
   },
   async onScan() {
     try {

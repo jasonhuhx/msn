@@ -9,15 +9,14 @@ type Account = {
   balance: string;
 };
 type DatabasePropertyTypes = 'title' | 'date' | 'number';
-type DatabaseProperties = {
-  [key: string]: {
-    type: DatabasePropertyTypes;
-  };
+type DatabaseProperty = {
+  type: DatabasePropertyTypes;
+  name: string;
 };
 type Database = {
   id: string;
   title: string;
   icon: string | null;
   emoji: string | null;
-  properties: DatabaseProperties;
+  properties: DatabaseProperty[];
 };
