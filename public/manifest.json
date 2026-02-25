@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Mint Money",
+  "version": "1.0",
+  "description": "Extracts the balance amount from a page.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["https://api.notion.com/*"],
+  "options_page": "src/options/index.html",
+  "action": {
+    "default_popup": "src/popup/index.html",
+    "default_icon": {
+      "16": "icon.png"
+    }
+  }
+}

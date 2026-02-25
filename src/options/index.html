@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Settings</title>
+  </head>
+  <body class="min-h-screen p-6 font-sans">
+    <div class="max-w-lg mx-auto bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-md">
+      <h1 class="font-sans text-2xl font-extrabold mb-4">Settings</h1>
+      <div id="account-options" x-data="accountOptions">
+        <div>
+          <h2 class="font-sans text-xl font-semibold mb-2">Select Accounts</h2>
+          <p class="font-mono text-sm text-gray-500 dark:text-gray-400">Select the accounts you want to sync with Notion.</p>
+          <ul class="card-section w-full text-sm font-medium overflow-x-auto sm:flex">
+            <template x-for="(account, index) in availableAccounts" :key="account.className">
+              <li class="flex px-3" :class="getClassName">
+                <div class="flex items-center rounded-lg">
+                  <input
+                    type="checkbox"
+                    :id="getCheckBoxId"
+                    :value="account.className"
+                    @change="onCheckBoxChange"
+                    :checked="isChecked"
+                    class="w-4 h-4 text-theme accent-theme bg-gray-100 border-gray-300 rounded-sm focus:ring-lime-600 dark:focus:ring-lime-500 dark:ring-offset-gray-700 dark:focus:ring-offset-gray-700 focus:ring-2 dark:bg-gray-600 dark:border-gray-500"
+                  />
+                  <label :for="getCheckBoxId" class="w-full py-3 ms-2 text-sm font-medium text-gray-900 dark:text-gray-300" x-text="account.title"></label>
+                </div>
+              </li>
+            </template>
+          </ul>
+        </div>
+        <hr class="h-px my-3 bg-gray-300 border-0 dark:bg-gray-700" />
+        <div x-data="notion" @on-loading.window="onLoading" @on-notion-error.window="errorHandling">
+          <h2 class="font-sans text-xl font-semibold mb-2">Notion API</h2>
+          <div class="mb-4">
+            <label for="notion-api-key" class="block my-3 text-sm font-medium text-gray-900 dark:text-gray-300"
+              >Notion API Key
+              <p class="text-gray-500 dark:text-gray-400">To sync your accounts to Notion database, you need to provide your Notion API key.</p>
+            </label>
+            <div class="flex">
+              <input
+                type="text"
+                id="notion-api-key"
+                :value="notionApiKey"
+                @change="onApiChange"
+                class="flex-1 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
+                placeholder="Enter your Notion API key"
+                required
+              />
+              <button @click="onScan" class="ml-2 btn-primary text-sm" :class="getBtnClassName">refresh</button>
+            </div>
+            <template x-if="error">
+              <p class="text-red-500" x-text="error"></p>
+            </template>
+            <template x-if="showSelectedDB">
+              <div>
+                <label class="block my-3 text-sm font-medium text-gray-900 dark:text-gray-300"
+                  >Connected To
+                  <span class="font-mono text-sm text-theme"
+                    >database://"<span class="font-mono text-sm text-theme" x-text="selectedDatabase.title"></span>"</span
+                  >
+                  <p class="text-gray-500 dark:text-gray-400">To connect to a different database, refresh and select one from the retrieved list.</p>
+                </label>
+
+                <div class="card-section block w-full p-3 dark:text-gray-400 dark:bg-gray-800">
+                  <template x-if="selectedDatabase.icon">
+                    <img :src="selectedDatabase.icon" class="mb-2 w-7 h-7" />
+                  </template>
+                  <template x-if="selectedDatabase.emoji">
+                    <span class="mb-2 w-7 h-7 text-[28px]" x-text="selectedDatabase.emoji"></span>
+                  </template>
+                  <div class="w-full text-lg font-semibold" x-text="selectedDatabase.title"></div>
+                  <template x-for="(property, index) in selectedDatabase.properties" :key="property.name">
+                    <div class="inline-block after:mx-2 after:content-['_/_'] last:after:content-none">
+                      <p class="inline-block pr-0.5" x-text="property.name"></p>
+                      <span x-text="property.type" :class="getPropertyClassName" class="text-xs font-medium px-2.5 py-0.5 font-mono rounded-full"></span>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+            <template x-if="showDatabaseList">
+              <div>
+                <label class="block my-3 text-sm font-medium text-gray-900 dark:text-gray-300">
+                  Available Databases:
+                  <span class="font-mono text-sm text-theme">SELECT * FROM "Connected Databases"</span>
+                </label>
+                <ul class="w-full text-sm">
+                  <template x-for="(db, index) in databaseList" :key="db.id">
+                    <li class="flex w-full mt-3">
+                      <input @change="onCheckBoxChange" type="checkbox" :id="db.id" :value="db.id" class="hidden peer" :checked="isChecked" />
+                      <label
+                        :for="db.id"
+                        class="card-section inline-flex items-center justify-between w-full p-3 cursor-pointer dark:hover:text-gray-300 dark:border-gray-700 peer-checked:border-theme dark:peer-checked:border-green-500 hover:text-gray-600 dark:peer-checked:text-gray-300 peer-checked:text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:bg-gray-800 dark:hover:bg-gray-700"
+                      >
+                        <div class="block">
+                          <template x-if="db.icon">
+                            <img :src="db.icon" class="mb-2 w-7 h-7" />
+                          </template>
+                          <template x-if="db.emoji">
+                            <span class="mb-2 w-7 h-7 text-[28px]" x-text="db.emoji"></span>
+                          </template>
+                          <div class="w-full text-lg font-semibold" x-text="db.title"></div>
+                          <template x-for="(property, index) in db.properties" :key="property.name">
+                            <div class="inline-block after:mx-2 after:content-['_/_'] last:after:content-none">
+                              <p class="inline-block pr-0.5" x-text="property.name"></p>
+                              <span
+                                x-text="property.type"
+                                :class="getPropertyClassName"
+                                class="text-xs font-medium px-2.5 py-0.5 font-mono rounded-full"
+                              ></span>
+                            </div>
+                          </template>
+                        </div>
+                      </label>
+                    </li>
+                  </template>
+                </ul>
+              </div>
+            </template>
+          </div>
+        </div>
+        <div class="flex justify-end mt-6">
+          <button @click="onSave" x-text="buttonTitle" class="btn-primary py-2 px-6 text-lg"></button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="index.ts"></script>
+  </body>
+</html>
