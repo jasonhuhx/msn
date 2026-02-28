@@ -1,126 +1,385 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <meta charset="UTF-8" />
     <title>Settings</title>
   </head>
-  <body class="min-h-screen p-6 font-sans">
-    <div class="max-w-lg mx-auto bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-md">
-      <h1 class="font-sans text-2xl font-extrabold mb-4">Settings</h1>
-      <div id="account-options" x-data="accountOptions">
-        <div>
-          <h2 class="font-sans text-xl font-semibold mb-2">Select Accounts</h2>
-          <p class="font-mono text-sm text-gray-500 dark:text-gray-400">Select the accounts you want to sync with Notion.</p>
-          <ul class="card-section w-full text-sm font-medium overflow-x-auto sm:flex">
-            <template x-for="(account, index) in availableAccounts" :key="account.className">
-              <li class="flex px-3" :class="getClassName">
-                <div class="flex items-center rounded-lg">
-                  <input
-                    type="checkbox"
-                    :id="getCheckBoxId"
-                    :value="account.className"
-                    @change="onCheckBoxChange"
-                    :checked="isChecked"
-                    class="w-4 h-4 text-theme accent-theme bg-gray-100 border-gray-300 rounded-sm focus:ring-lime-600 dark:focus:ring-lime-500 dark:ring-offset-gray-700 dark:focus:ring-offset-gray-700 focus:ring-2 dark:bg-gray-600 dark:border-gray-500"
-                  />
-                  <label :for="getCheckBoxId" class="w-full py-3 ms-2 text-sm font-medium text-gray-900 dark:text-gray-300" x-text="account.title"></label>
-                </div>
-              </li>
-            </template>
-          </ul>
-        </div>
-        <hr class="h-px my-3 bg-gray-300 border-0 dark:bg-gray-700" />
-        <div x-data="notion" @on-loading.window="onLoading" @on-notion-error.window="errorHandling">
-          <h2 class="font-sans text-xl font-semibold mb-2">Notion API</h2>
-          <div class="mb-4">
-            <label for="notion-api-key" class="block my-3 text-sm font-medium text-gray-900 dark:text-gray-300"
-              >Notion API Key
-              <p class="text-gray-500 dark:text-gray-400">To sync your accounts to Notion database, you need to provide your Notion API key.</p>
-            </label>
-            <div class="flex">
-              <input
-                type="text"
-                id="notion-api-key"
-                :value="notionApiKey"
-                @change="onApiChange"
-                class="flex-1 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white"
-                placeholder="Enter your Notion API key"
-                required
-              />
-              <button @click="onScan" class="ml-2 btn-primary text-sm" :class="getBtnClassName">refresh</button>
-            </div>
-            <template x-if="error">
-              <p class="text-red-500" x-text="error"></p>
-            </template>
-            <template x-if="showSelectedDB">
-              <div>
-                <label class="block my-3 text-sm font-medium text-gray-900 dark:text-gray-300"
-                  >Connected To
-                  <span class="font-mono text-sm text-theme"
-                    >database://"<span class="font-mono text-sm text-theme" x-text="selectedDatabase.title"></span>"</span
-                  >
-                  <p class="text-gray-500 dark:text-gray-400">To connect to a different database, refresh and select one from the retrieved list.</p>
-                </label>
+  <body class="min-h-screen bg-stone-100 p-6 text-stone-900">
+    <div class="mx-auto max-w-5xl" x-data="accountOptions">
+      <div class="mb-6">
+        <h1 class="text-3xl font-extrabold tracking-tight">Money Sync Settings</h1>
+        <p class="mt-2 max-w-2xl text-stone-600">
+          Configure the balance database you already sync into, then add a dedicated transactions database with explicit field mapping.
+        </p>
+      </div>
 
-                <div class="card-section block w-full p-3 dark:text-gray-400 dark:bg-gray-800">
-                  <template x-if="selectedDatabase.icon">
-                    <img :src="selectedDatabase.icon" class="mb-2 w-7 h-7" />
-                  </template>
-                  <template x-if="selectedDatabase.emoji">
-                    <span class="mb-2 w-7 h-7 text-[28px]" x-text="selectedDatabase.emoji"></span>
-                  </template>
-                  <div class="w-full text-lg font-semibold" x-text="selectedDatabase.title"></div>
-                  <template x-for="(property, index) in selectedDatabase.properties" :key="property.name">
-                    <div class="inline-block after:mx-2 after:content-['_/_'] last:after:content-none">
-                      <p class="inline-block pr-0.5" x-text="property.name"></p>
-                      <span x-text="property.type" :class="getPropertyClassName" class="text-xs font-medium px-2.5 py-0.5 font-mono rounded-full"></span>
-                    </div>
-                  </template>
+      <div class="space-y-5">
+        <section class="card-section p-5">
+          <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h2 class="text-xl font-semibold">Notion API</h2>
+              <p class="mt-1 text-stone-500">Use the same integration token for both sync modes.</p>
+            </div>
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">Shared across all settings</p>
+          </div>
+
+          <label for="notion-api-key" class="mb-2 block text-sm font-medium text-stone-700">Notion API Key</label>
+          <input
+            id="notion-api-key"
+            :value="notionApiKey"
+            @input="onApiInput"
+            type="password"
+            placeholder="secret_..."
+            class="w-full rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm text-stone-900 shadow-sm outline-none transition focus:border-lime-700 focus:ring-2 focus:ring-lime-700/20"
+          />
+        </section>
+
+        <div class="space-y-0">
+          <div class="border-b border-stone-200">
+            <div class="-mb-px flex gap-2">
+              <button
+                @click="openAccountSyncTab"
+                :class="accountTabButtonClass"
+                class="rounded-t-2xl border px-5 py-3 text-left transition"
+              >
+                <p class="text-sm font-semibold">Account Sync</p>
+                <p class="mt-1 text-xs text-stone-500">Balances and account selection</p>
+              </button>
+              <button
+                @click="openTransactionSyncTab"
+                :class="transactionsTabButtonClass"
+                class="rounded-t-2xl border px-5 py-3 text-left transition"
+              >
+                <p class="text-sm font-semibold">Transaction Sync</p>
+                <p class="mt-1 text-xs text-stone-500">Database link and field mapping</p>
+              </button>
+            </div>
+          </div>
+
+          <section x-show="showingAccountSyncTab" class="-mt-px">
+            <div class="card-section rounded-t-none border-t-0 p-5">
+            <div class="mb-5">
+              <h2 class="text-2xl font-semibold">Account Sync</h2>
+              <p class="mt-1 max-w-3xl text-stone-500">
+                Configure the balance database and choose which account groups should appear in the existing balance sync flow.
+              </p>
+            </div>
+
+            <div class="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(300px,0.85fr)]">
+              <section class="rounded-3xl border border-stone-200 bg-stone-50 p-5">
+                <div class="mb-4">
+                  <h3 class="text-xl font-semibold">Account Balance Database</h3>
+                  <p class="mt-1 text-stone-500">Use a direct Notion database link for the balance sync target.</p>
                 </div>
-              </div>
-            </template>
-            <template x-if="showDatabaseList">
-              <div>
-                <label class="block my-3 text-sm font-medium text-gray-900 dark:text-gray-300">
-                  Available Databases:
-                  <span class="font-mono text-sm text-theme">SELECT * FROM "Connected Databases"</span>
-                </label>
-                <ul class="w-full text-sm">
-                  <template x-for="(db, index) in databaseList" :key="db.id">
-                    <li class="flex w-full mt-3">
-                      <input @change="onCheckBoxChange" type="checkbox" :id="db.id" :value="db.id" class="hidden peer" :checked="isChecked" />
-                      <label
-                        :for="db.id"
-                        class="card-section inline-flex items-center justify-between w-full p-3 cursor-pointer dark:hover:text-gray-300 dark:border-gray-700 peer-checked:border-theme dark:peer-checked:border-green-500 hover:text-gray-600 dark:peer-checked:text-gray-300 peer-checked:text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:bg-gray-800 dark:hover:bg-gray-700"
-                      >
-                        <div class="block">
-                          <template x-if="db.icon">
-                            <img :src="db.icon" class="mb-2 w-7 h-7" />
+
+                <label for="balance-link" class="mb-2 block text-sm font-medium text-stone-700">Balance Database Block Link</label>
+                <div class="flex gap-2">
+                  <input
+                    id="balance-link"
+                    :value="balanceState.link"
+                    @input="onBalanceLinkInput"
+                    type="text"
+                    placeholder="https://www.notion.so/..."
+                    class="min-w-0 flex-1 rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm text-stone-900 shadow-sm outline-none transition focus:border-lime-700 focus:ring-2 focus:ring-lime-700/20"
+                  />
+                  <button @click="connectBalanceDatabase" class="btn-primary px-4 text-sm" x-text="balanceConnectButtonLabel"></button>
+                </div>
+
+                <template x-if="balanceState.error">
+                  <p class="mt-3 text-sm text-red-600" x-text="balanceState.error"></p>
+                </template>
+
+                <div class="mt-4 rounded-2xl border border-dashed border-stone-300 bg-white p-4">
+                  <div class="mb-3 flex items-start justify-between gap-3">
+                    <div>
+                      <p class="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Required Schema</p>
+                      <ul class="mt-2 space-y-1 text-sm text-stone-600">
+                        <template x-for="field in balanceRequiredSchema" :key="field">
+                          <li x-text="field"></li>
+                        </template>
+                      </ul>
+                    </div>
+                    <button
+                      x-show="hasBalanceDatabase"
+                      @click="clearBalanceDatabase"
+                      class="rounded-full border border-stone-300 px-3 py-1 text-xs font-semibold text-stone-700 transition hover:border-stone-400 hover:bg-stone-100"
+                    >
+                      Clear
+                    </button>
+                  </div>
+
+                  <template x-if="hasBalanceDatabase">
+                    <div class="space-y-3">
+                      <div class="flex items-center gap-3">
+                        <template x-if="balanceDatabase.icon">
+                          <img :src="balanceDatabase.icon" alt="" class="h-9 w-9 rounded-lg" />
+                        </template>
+                        <template x-if="hasBalanceEmojiOnly">
+                          <span class="text-3xl" x-text="balanceDatabase.emoji"></span>
+                        </template>
+                        <div>
+                          <h4 class="font-semibold text-stone-900" x-text="balanceDatabase.title"></h4>
+                          <p class="text-xs text-stone-500" x-text="balanceDatabase.id"></p>
+                        </div>
+                      </div>
+
+                      <div class="flex flex-wrap gap-2">
+                        <template x-for="property in balanceDatabase.properties" :key="property.id">
+                          <span class="rounded-full px-2.5 py-1 text-xs font-semibold" :class="property.badgeClass">
+                            <span x-text="property.name"></span>
+                            <span class="font-mono opacity-70" x-text="property.type"></span>
+                          </span>
+                        </template>
+                      </div>
+
+                      <template x-if="balanceSchemaStatus">
+                        <div class="rounded-xl border border-stone-200 bg-stone-50 p-3 text-sm text-stone-700">
+                          <p class="font-semibold" :class="balanceSchemaToneClass">
+                            <span x-text="balanceSchemaHeadline"></span>
+                          </p>
+                          <template x-if="balanceSchemaStatus.autoCreatedFields.length">
+                            <p class="mt-2 text-stone-600">
+                              Auto-created:
+                              <span x-text="balanceAutoCreatedFieldsText"></span>
+                            </p>
                           </template>
-                          <template x-if="db.emoji">
-                            <span class="mb-2 w-7 h-7 text-[28px]" x-text="db.emoji"></span>
+                          <template x-if="balanceSchemaStatus.missingFields.length">
+                            <p class="mt-2 text-red-600">
+                              Missing:
+                              <span x-text="balanceMissingFieldsText"></span>
+                            </p>
                           </template>
-                          <div class="w-full text-lg font-semibold" x-text="db.title"></div>
-                          <template x-for="(property, index) in db.properties" :key="property.name">
-                            <div class="inline-block after:mx-2 after:content-['_/_'] last:after:content-none">
-                              <p class="inline-block pr-0.5" x-text="property.name"></p>
-                              <span
-                                x-text="property.type"
-                                :class="getPropertyClassName"
-                                class="text-xs font-medium px-2.5 py-0.5 font-mono rounded-full"
-                              ></span>
-                            </div>
+                          <template x-if="balanceSchemaStatus.notes.length">
+                            <p class="mt-2 text-stone-600" x-text="balanceNotesText"></p>
                           </template>
                         </div>
-                      </label>
+                      </template>
+                    </div>
+                  </template>
+
+                  <template x-if="noBalanceDatabase">
+                    <p class="text-sm text-stone-500">No balance database connected yet.</p>
+                  </template>
+                </div>
+              </section>
+
+              <section class="rounded-3xl border border-stone-200 bg-stone-50 p-5">
+                <div class="mb-4">
+                  <h3 class="text-xl font-semibold">Select Accounts</h3>
+                  <p class="mt-1 text-stone-500">Choose which account groups should appear in balance sync.</p>
+                </div>
+
+                <ul class="overflow-hidden rounded-2xl border border-stone-200 bg-white text-sm">
+                  <template x-for="(account, index) in availableAccounts" :key="account.className">
+                    <li class="flex w-full border-b border-stone-200 px-4 last:border-b-0">
+                      <div class="flex items-center py-3">
+                        <input
+                          type="checkbox"
+                          :id="account.className"
+                          data-account-checkbox
+                          x-model="selectedAccounts"
+                          :value="account.className"
+                          @change="onCheckBoxChange"
+                          class="h-4 w-4 rounded-sm border border-stone-300 accent-lime-700 focus:ring-2 focus:ring-lime-600"
+                        />
+                        <label :for="account.className" class="ml-3 text-sm font-medium text-stone-800" x-text="account.title"></label>
+                      </div>
                     </li>
                   </template>
                 </ul>
+              </section>
+            </div>
+            </div>
+          </section>
+
+          <section x-show="showingTransactionSyncTab" class="-mt-px">
+            <div class="card-section rounded-t-none border-t-0 p-5">
+            <div class="mb-5">
+              <h2 class="text-2xl font-semibold">Transaction Sync</h2>
+              <p class="mt-1 max-w-3xl text-stone-500">
+                Connect a dedicated transactions database, auto-fill the basic schema, and confirm the field mapping used during sync.
+              </p>
+            </div>
+
+            <section class="rounded-3xl border border-stone-200 bg-stone-50 p-5">
+              <div class="mb-4">
+                <h3 class="text-xl font-semibold">Transactions Database</h3>
+                <p class="mt-1 text-stone-500">This database is separate from balance sync and stores credit card transaction rows.</p>
               </div>
-            </template>
-          </div>
+
+              <label for="transactions-link" class="mb-2 block text-sm font-medium text-stone-700">Transactions Database Block Link</label>
+              <div class="flex gap-2">
+                <input
+                  id="transactions-link"
+                  :value="transactionsState.link"
+                  @input="onTransactionsLinkInput"
+                  type="text"
+                  placeholder="https://www.notion.so/..."
+                  class="min-w-0 flex-1 rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm text-stone-900 shadow-sm outline-none transition focus:border-lime-700 focus:ring-2 focus:ring-lime-700/20"
+                />
+                <button @click="connectTransactionsDatabase" class="btn-primary px-4 text-sm" x-text="transactionsConnectButtonLabel"></button>
+              </div>
+
+              <template x-if="transactionsState.error">
+                <p class="mt-3 text-sm text-red-600" x-text="transactionsState.error"></p>
+              </template>
+
+              <div class="mt-4 rounded-2xl border border-dashed border-stone-300 bg-white p-4">
+                <div class="mb-3 flex items-start justify-between gap-3">
+                  <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-stone-500">Required Schema</p>
+                    <ul class="mt-2 space-y-1 text-sm text-stone-600">
+                      <template x-for="field in transactionsRequiredSchema" :key="field">
+                        <li x-text="field"></li>
+                      </template>
+                    </ul>
+                  </div>
+                  <button
+                    x-show="hasTransactionsDatabase"
+                    @click="clearTransactionsDatabase"
+                    class="rounded-full border border-stone-300 px-3 py-1 text-xs font-semibold text-stone-700 transition hover:border-stone-400 hover:bg-stone-100"
+                  >
+                    Clear
+                  </button>
+                </div>
+
+                <template x-if="hasTransactionsDatabase">
+                  <div class="space-y-4">
+                    <div class="flex items-center gap-3">
+                      <template x-if="transactionsDatabase.icon">
+                        <img :src="transactionsDatabase.icon" alt="" class="h-9 w-9 rounded-lg" />
+                      </template>
+                      <template x-if="hasTransactionsEmojiOnly">
+                        <span class="text-3xl" x-text="transactionsDatabase.emoji"></span>
+                      </template>
+                      <div>
+                        <h4 class="font-semibold text-stone-900" x-text="transactionsDatabase.title"></h4>
+                        <p class="text-xs text-stone-500" x-text="transactionsDatabase.id"></p>
+                      </div>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2">
+                      <template x-for="property in transactionsDatabase.properties" :key="property.id">
+                        <span class="rounded-full px-2.5 py-1 text-xs font-semibold" :class="property.badgeClass">
+                          <span x-text="property.name"></span>
+                          <span class="font-mono opacity-70" x-text="property.type"></span>
+                        </span>
+                      </template>
+                    </div>
+
+                    <template x-if="transactionsSchemaStatus">
+                      <div class="rounded-xl border border-stone-200 bg-stone-50 p-3 text-sm text-stone-700">
+                        <p class="font-semibold" :class="transactionsSchemaToneClass">
+                          <span x-text="transactionsSchemaHeadline"></span>
+                        </p>
+                        <template x-if="transactionsSchemaStatus.autoCreatedFields.length">
+                          <p class="mt-2 text-stone-600">
+                            Auto-created:
+                            <span x-text="transactionsAutoCreatedFieldsText"></span>
+                          </p>
+                        </template>
+                        <template x-if="transactionsSchemaStatus.missingFields.length">
+                          <p class="mt-2 text-red-600">
+                            Missing:
+                            <span x-text="transactionsMissingFieldsText"></span>
+                          </p>
+                        </template>
+                        <template x-if="transactionsSchemaStatus.notes.length">
+                          <p class="mt-2 text-stone-600" x-text="transactionsNotesText"></p>
+                        </template>
+                      </div>
+                    </template>
+
+                    <div class="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                      <div class="mb-3">
+                        <h4 class="font-semibold text-stone-900">Transactions Field Mapping</h4>
+                        <p class="mt-1 text-sm text-stone-500">Choose the exact Notion fields that should receive the synced transactions.</p>
+                      </div>
+
+                      <div class="grid gap-3 md:grid-cols-2">
+                        <label class="text-sm text-stone-700">
+                          <span class="mb-1 block font-medium">Date Field</span>
+                          <select
+                            @change="onTransactionsDateChange"
+                            class="w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-lime-700 focus:ring-2 focus:ring-lime-700/20"
+                          >
+                            <option value="">Select a date field</option>
+                            <template x-for="property in transactionsDateOptions" :key="property.id">
+                              <option :value="property.name" :selected="property.selected" x-text="property.name"></option>
+                            </template>
+                          </select>
+                        </label>
+
+                        <label class="text-sm text-stone-700">
+                          <span class="mb-1 block font-medium">Amount Field</span>
+                          <select
+                            @change="onTransactionsAmountChange"
+                            class="w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-lime-700 focus:ring-2 focus:ring-lime-700/20"
+                          >
+                            <option value="">Select a number field</option>
+                            <template x-for="property in transactionsAmountOptions" :key="property.id">
+                              <option :value="property.name" :selected="property.selected" x-text="property.name"></option>
+                            </template>
+                          </select>
+                        </label>
+
+                        <label class="text-sm text-stone-700">
+                          <span class="mb-1 block font-medium">Merchant/Description Field</span>
+                          <select
+                            @change="onTransactionsMerchantChange"
+                            class="w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-lime-700 focus:ring-2 focus:ring-lime-700/20"
+                          >
+                            <option value="">Select a text field</option>
+                            <template x-for="property in transactionsMerchantOptions" :key="property.id">
+                              <option :value="property.name" :selected="property.selected" x-text="property.name"></option>
+                            </template>
+                          </select>
+                        </label>
+
+                        <label class="text-sm text-stone-700">
+                          <span class="mb-1 block font-medium">Account Name Field</span>
+                          <select
+                            @change="onTransactionsAccountNameChange"
+                            class="w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-lime-700 focus:ring-2 focus:ring-lime-700/20"
+                          >
+                            <option value="">Select a rich_text field</option>
+                            <template x-for="property in transactionsAccountNameOptions" :key="property.id">
+                              <option :value="property.name" :selected="property.selected" x-text="property.name"></option>
+                            </template>
+                          </select>
+                        </label>
+                      </div>
+
+                      <template x-if="transactionsMappingErrors.length">
+                        <div class="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                          <template x-for="message in transactionsMappingErrors" :key="message">
+                            <p x-text="message"></p>
+                          </template>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+
+                <template x-if="noTransactionsDatabase">
+                  <p class="text-sm text-stone-500">No transactions database connected yet.</p>
+                </template>
+              </div>
+            </section>
+            </div>
+          </section>
         </div>
-        <div class="flex justify-end mt-6">
-          <button @click="onSave" x-text="buttonTitle" class="btn-primary py-2 px-6 text-lg"></button>
+      </div>
+
+      <div class="mt-6 rounded-2xl bg-stone-900 px-5 py-4 text-stone-50 shadow-lg">
+        <div>
+          <p class="text-sm font-semibold">Auto-save enabled</p>
+          <template x-if="saveHintText">
+            <p class="mt-1 text-xs text-stone-300" x-text="saveHintText"></p>
+          </template>
+          <template x-if="noSaveHint">
+            <p class="mt-1 text-xs text-stone-300">All settings on this page are saved locally as soon as you change them.</p>
+          </template>
         </div>
       </div>
     </div>
