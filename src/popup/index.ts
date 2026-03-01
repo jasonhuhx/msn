@@ -68,7 +68,10 @@ type NotionQueryPage = {
 };
 
 const getTransactionsDateRange = (transactions: Transaction[]): { start: string; end: string } | null => {
-  const dates = transactions.map((transaction) => transaction.date).filter(Boolean).sort();
+  const dates = transactions
+    .map((transaction) => transaction.date)
+    .filter(Boolean)
+    .sort();
   if (dates.length === 0) {
     return null;
   }
@@ -81,7 +84,10 @@ const getTransactionsDateRange = (transactions: Transaction[]): { start: string;
 
 const getPlainTextFromProperty = (property: NotionPageProperty | undefined): string => {
   const textItems = property?.type === 'title' ? property.title : property?.rich_text;
-  return (textItems ?? []).map((item) => item.plain_text ?? '').join('').trim();
+  return (textItems ?? [])
+    .map((item) => item.plain_text ?? '')
+    .join('')
+    .trim();
 };
 
 const getExistingTransactionSyncIds = async (
@@ -123,7 +129,7 @@ const getExistingTransactionSyncIds = async (
       }
     });
 
-    startCursor = result.has_more ? result.next_cursor ?? undefined : undefined;
+    startCursor = result.has_more ? (result.next_cursor ?? undefined) : undefined;
   } while (startCursor);
 
   return syncIds;
@@ -181,13 +187,7 @@ Alpine.data('popup', () => ({
     return this.transactionsDatabase.schemaStatus?.isValid ? 'Ready' : 'Needs attention';
   },
   get canSyncBalanceState() {
-    return Boolean(
-      this.balanceDatabase &&
-        this.notionApiKey &&
-        this.balanceDatabase.schemaStatus?.isValid &&
-        !this.isLoading &&
-        this.filteredAccts.length > 0,
-    );
+    return Boolean(this.balanceDatabase && this.notionApiKey && this.balanceDatabase.schemaStatus?.isValid && !this.isLoading && this.filteredAccts.length > 0);
   },
   get canSyncTransactionsState() {
     if (!this.transactionsDatabase || !this.notionApiKey || !this.transactionsDatabase.schemaStatus?.isValid || this.isLoading) {
@@ -407,12 +407,8 @@ Alpine.data('popup', () => ({
         transactionsDatabase,
       });
 
-      const merchantProperty = transactionsDatabase.properties.find(
-        (property) => property.name === this.transactionsFieldMapping!.merchantProperty,
-      );
-      const syncIdProperty = transactionsDatabase.properties.find(
-        (property) => property.name === TRANSACTION_SYNC_ID_PROPERTY,
-      );
+      const merchantProperty = transactionsDatabase.properties.find((property) => property.name === this.transactionsFieldMapping!.merchantProperty);
+      const syncIdProperty = transactionsDatabase.properties.find((property) => property.name === TRANSACTION_SYNC_ID_PROPERTY);
 
       if (!merchantProperty || !syncIdProperty) {
         this.error = 'Transactions database is missing either the merchant field or the Sync ID field.';
@@ -538,41 +534,42 @@ const getAllAccounts = (selectedTypes: string[]) => {
 };
 
 const getPageMode = () => {
-  const hasTransactions = () => Boolean(
-    document.querySelector('.transaction-list .merchant-cleansing table tbody tr.transaction-row') ||
+  const hasTransactions = () =>
+    Boolean(
+      document.querySelector('.transaction-list .merchant-cleansing table tbody tr.transaction-row') ||
       document.querySelector('.transactions .transaction-list tbody tr.transaction-row'),
-  );
+    );
   const hasBalances = () => Boolean(document.querySelector('.account-groups-container'));
 
   if (hasTransactions()) {
-    return Promise.resolve('transactions');
+    return 'transactions';
   }
 
   if (hasBalances()) {
-    return Promise.resolve('balances');
+    return 'balances';
   }
+  return 'unknown';
+  // return new Promise<'unknown' | 'balances' | 'transactions'>((resolve) => {
+  //   const startedAt = Date.now();
+  //   const intervalId = window.setInterval(() => {
+  //     if (hasTransactions()) {
+  //       window.clearInterval(intervalId);
+  //       resolve('transactions');
+  //       return;
+  //     }
 
-  return new Promise<'unknown' | 'balances' | 'transactions'>((resolve) => {
-    const startedAt = Date.now();
-    const intervalId = window.setInterval(() => {
-      if (hasTransactions()) {
-        window.clearInterval(intervalId);
-        resolve('transactions');
-        return;
-      }
+  //     if (hasBalances()) {
+  //       window.clearInterval(intervalId);
+  //       resolve('balances');
+  //       return;
+  //     }
 
-      if (hasBalances()) {
-        window.clearInterval(intervalId);
-        resolve('balances');
-        return;
-      }
-
-      if (Date.now() - startedAt >= 4000) {
-        window.clearInterval(intervalId);
-        resolve('unknown');
-      }
-    }, 200);
-  });
+  //     if (Date.now() - startedAt >= 4000) {
+  //       window.clearInterval(intervalId);
+  //       resolve('unknown');
+  //     }
+  //   }, 200);
+  // });
 };
 
 const getTransactionsFromPage = () => {
@@ -584,9 +581,7 @@ const getTransactionsFromPage = () => {
   const getTransactionRows = () =>
     Array.from(document.querySelectorAll('tr.transaction-row')).filter(
       (row) =>
-        Boolean(row.querySelector('.transactionDate span')) &&
-        Boolean(row.querySelector('.transactionDescription')) &&
-        Boolean(row.querySelector('td.amount')),
+        Boolean(row.querySelector('.transactionDate span')) && Boolean(row.querySelector('.transactionDescription')) && Boolean(row.querySelector('td.amount')),
     );
 
   const parseTransactionDate = (value: string): string => {
@@ -601,8 +596,7 @@ const getTransactionsFromPage = () => {
     return `${year}-${month}-${day}`;
   };
 
-  const cardProductName =
-    (document.querySelector('.card-details-main .product-name') as HTMLElement | null)?.innerText.replace(/\s+/g, ' ').trim() ?? '';
+  const cardProductName = (document.querySelector('.card-details-main .product-name') as HTMLElement | null)?.innerText.replace(/\s+/g, ' ').trim() ?? '';
   const buildTransactions = () => {
     const rows = getTransactionRows();
 
@@ -617,16 +611,9 @@ const getTransactionsFromPage = () => {
       const category = categoryIcon?.title?.trim() ?? '';
       const cardLastFour = (maskedCardNumber.match(/(\d{4})$/) ?? [])[1] ?? '';
       const amountValue = parseInjectedSignedAmount(amountText);
-      const direction = amountClassList.includes('credit')
-        ? 'credit'
-        : amountClassList.includes('debit')
-          ? 'debit'
-          : 'unknown';
-      const accountName = cardProductName && cardLastFour
-        ? `${cardProductName} ${cardLastFour}`
-        : cardLastFour
-          ? `Card ${cardLastFour}`
-          : cardProductName || 'Card';
+      const direction = amountClassList.includes('credit') ? 'credit' : amountClassList.includes('debit') ? 'debit' : 'unknown';
+      const accountName =
+        cardProductName && cardLastFour ? `${cardProductName} ${cardLastFour}` : cardLastFour ? `Card ${cardLastFour}` : cardProductName || 'Card';
 
       return {
         key: `${dateText}-${amountText}-${description}-${maskedCardNumber}`,
@@ -785,9 +772,7 @@ const scanCurrentPage = () => {
 
             chrome.storage.local.set({ availableAccounts });
             const settings = await getExtensionSettings();
-            const selectedAccounts = settings.selectedAccounts.length
-              ? settings.selectedAccounts
-              : Object.keys(availableAccounts);
+            const selectedAccounts = settings.selectedAccounts.length ? settings.selectedAccounts : Object.keys(availableAccounts);
 
             chrome.scripting.executeScript(
               {
@@ -820,6 +805,20 @@ const scanCurrentPage = () => {
     );
   });
 };
+// TODO: consider event-based scanCurrentPage() refresh, but 
+// the listener only exists while the popup is open.
+// for continuous tab monitoring, this should live in a background/service worker script, not popup runtime.
+//
+// chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+//   if (changeInfo.status === 'complete' && tab.url) {
+//     const pageMode = getPageMode();
+//     console.log(`Tab ${tabId} changed to: ${tab.url}`, pageMode);
+//     scanCurrentPage();
+//   }
+// });
 
+/*
+* Popup scripts are ephemeral and only run while the popup is open. setInterval wouldnt act as supposed to do.
+*/
 scanCurrentPage();
-window.setInterval(scanCurrentPage, PAGE_SCAN_INTERVAL_MS);
+// window.setInterval(scanCurrentPage, PAGE_SCAN_INTERVAL_MS);
