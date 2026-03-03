@@ -4,11 +4,11 @@
     <meta charset="UTF-8" />
     <title>Settings</title>
   </head>
-  <body class="min-h-screen bg-stone-100 p-6 text-stone-900">
+  <body class="min-h-screen bg-stone-100 dark:bg-gray-800 p-6 text-stone-900">
     <div class="mx-auto max-w-5xl" x-data="accountOptions">
       <div class="mb-6">
-        <h1 class="text-3xl font-extrabold tracking-tight">Money Sync Settings</h1>
-        <p class="mt-2 max-w-2xl text-stone-600">
+        <h1 class="text-3xl font-extrabold tracking-tight dark:text-stone-200">Money Sync Settings</h1>
+        <p class="mt-2 max-w-2xl text-stone-600 dark:text-stone-400">
           Configure the balance database you already sync into, then add a dedicated transactions database with explicit field mapping.
         </p>
       </div>
@@ -18,12 +18,12 @@
           <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>
               <h2 class="text-xl font-semibold">Notion API</h2>
-              <p class="mt-1 text-stone-500">Use the same integration token for both sync modes.</p>
+              <p class="mt-1 text-stone-500 dark:text-stone-300">Use the same integration token for both sync modes.</p>
             </div>
             <p class="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400">Shared across all settings</p>
           </div>
 
-          <label for="notion-api-key" class="mb-2 block text-sm font-medium text-stone-700">Notion API Key</label>
+          <label for="notion-api-key" class="mb-2 block text-sm font-medium text-stone-700 dark:text-gray-300">Notion API Key</label>
           <input
             id="notion-api-key"
             :value="notionApiKey"
@@ -35,7 +35,7 @@
         </section>
 
         <div class="space-y-0">
-          <div class="border-b border-stone-200">
+          <div class=""> 
             <div class="-mb-px flex gap-2">
               <button
                 @click="openAccountSyncTab"
@@ -43,7 +43,7 @@
                 class="rounded-t-2xl border px-5 py-3 text-left transition"
               >
                 <p class="text-sm font-semibold">Account Sync</p>
-                <p class="mt-1 text-xs text-stone-500">Balances and account selection</p>
+                <p class="mt-1 text-xs text-stone-500 ">Balances and account selection</p>
               </button>
               <button
                 @click="openTransactionSyncTab"
@@ -57,10 +57,10 @@
           </div>
 
           <section x-show="showingAccountSyncTab" class="-mt-px">
-            <div class="card-section rounded-t-none border-t-0 p-5">
+            <div class="card-section rounded-t-none rounded-tr-lg border-t-0 p-5">
             <div class="mb-5">
               <h2 class="text-2xl font-semibold">Account Sync</h2>
-              <p class="mt-1 max-w-3xl text-stone-500">
+              <p class="mt-1 max-w-3xl text-stone-500 dark:text-stone-300">
                 Configure the balance database and choose which account groups should appear in the existing balance sync flow.
               </p>
             </div>
@@ -68,7 +68,7 @@
             <div class="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(300px,0.85fr)]">
               <section class="rounded-3xl border border-stone-200 bg-stone-50 p-5">
                 <div class="mb-4">
-                  <h3 class="text-xl font-semibold">Account Balance Database</h3>
+                  <h3 class="text-xl font-semibold dark:text-stone-500">Account Balance Database</h3>
                   <p class="mt-1 text-stone-500">Use a direct Notion database link for the balance sync target.</p>
                 </div>
 
@@ -165,7 +165,7 @@
 
               <section class="rounded-3xl border border-stone-200 bg-stone-50 p-5">
                 <div class="mb-4">
-                  <h3 class="text-xl font-semibold">Select Accounts</h3>
+                  <h3 class="text-xl font-semibold dark:text-stone-500">Select Accounts</h3>
                   <p class="mt-1 text-stone-500">Choose which account groups should appear in balance sync.</p>
                 </div>
 
@@ -193,17 +193,17 @@
           </section>
 
           <section x-show="showingTransactionSyncTab" class="-mt-px">
-            <div class="card-section rounded-t-none border-t-0 p-5">
+            <div class="card-section rounded-t-none border-t-0 rounded-tr-lg p-5">
             <div class="mb-5">
               <h2 class="text-2xl font-semibold">Transaction Sync</h2>
-              <p class="mt-1 max-w-3xl text-stone-500">
+              <p class="mt-1 max-w-3xl text-stone-500 dark:text-stone-300">
                 Connect a dedicated transactions database, auto-fill the basic schema, and confirm the field mapping used during sync.
               </p>
             </div>
 
             <section class="rounded-3xl border border-stone-200 bg-stone-50 p-5">
               <div class="mb-4">
-                <h3 class="text-xl font-semibold">Transactions Database</h3>
+                <h3 class="text-xl font-semibold dark:text-stone-500">Transactions Database</h3>
                 <p class="mt-1 text-stone-500">This database is separate from balance sync and stores credit card transaction rows.</p>
               </div>
 
