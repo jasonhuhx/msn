@@ -3,7 +3,13 @@ import { Client } from '@notionhq/client';
 
 import '../global.css';
 import { detectBankFromHost } from '../lib/bank';
-import { createNotionClient, refreshNotionDatabaseConnection, TRANSACTION_SYNC_ID_PROPERTY, validateTransactionsFieldMapping } from '../lib/notion';
+import {
+  createNotionClient,
+  refreshNotionDatabaseConnection,
+  suggestTransactionsFieldMapping,
+  TRANSACTION_SYNC_ID_PROPERTY,
+  validateTransactionsFieldMapping,
+} from '../lib/notion';
 import { getExtensionSettings, saveExtensionSettings } from '../lib/storage';
 
 window.Alpine = Alpine;
@@ -43,7 +49,7 @@ const createTransactionSyncId = async (transaction: Transaction): Promise<string
   const seed = [
     normalizeSyncIdPart(transaction.merchant),
     transaction.date,
-    transaction.amountValue.toFixed(2),
+    transaction.rawAmountValue.toFixed(2),
     normalizeSyncIdPart(transaction.accountName),
   ].join('|');
 
@@ -62,43 +68,26 @@ const getTransactionAccountTypeLabel = (accountType: TransactionAccountType): st
   }
 };
 const getTransactionCurrencyCode = (transaction: Transaction): string | null => {
+  if (transaction.currencyCode) {
+    return transaction.currencyCode;
+  }
+
   const currencyMatch = transaction.amountText.match(/\b([A-Z]{3})\b/);
   return currencyMatch?.[1] ?? null;
 };
-const getDefaultTransactionAmount = (transaction: Transaction): number => {
-  const magnitude = Math.abs(transaction.amountValue);
-
-  if (transaction.direction === 'debit') {
-    return -magnitude;
-  }
-
-  if (transaction.direction === 'credit') {
-    return magnitude;
-  }
-
-  if (transaction.accountType === 'credit_card') {
-    return transaction.amountValue > 0 ? -magnitude : magnitude;
-  }
-
-  return transaction.amountValue < 0 ? -magnitude : magnitude;
-};
-const getEffectiveTransactionAmount = (transaction: Transaction, invertTransactionSigns: boolean): number => {
-  const defaultAmount = getDefaultTransactionAmount(transaction);
-  return invertTransactionSigns ? defaultAmount * -1 : defaultAmount;
-};
-const formatTransactionAmount = (transaction: Transaction, invertTransactionSigns: boolean): string => {
-  const amount = getEffectiveTransactionAmount(transaction, invertTransactionSigns);
+const getTransactionTypeLabel = (type: TransactionType): string => (type === 'debit' ? 'Debit' : 'Credit');
+const formatTransactionAmount = (transaction: Transaction): string => {
+  const amount = Math.abs(transaction.amountValue);
   const currencyCode = getTransactionCurrencyCode(transaction);
   const formatter = new Intl.NumberFormat(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-  const absAmount = formatter.format(Math.abs(amount));
-  const signPrefix = amount < 0 ? '- ' : '';
+  const absAmount = formatter.format(amount);
   const currencyPrefix = currencyCode === 'USD' ? 'US$' : '$';
   const currencySuffix = currencyCode ? ` ${currencyCode}` : '';
 
-  return `${signPrefix}${currencyPrefix}${absAmount}${currencySuffix}`;
+  return `${currencyPrefix}${absAmount}${currencySuffix}`;
 };
 type NotionTextFragment = {
   plain_text?: string;
@@ -207,11 +196,25 @@ const getExistingTransactionSyncIds = async (
   return syncIds;
 };
 
+const resolveTransactionsFieldMapping = (
+  mapping: TransactionsFieldMapping | null,
+  database: Database | null,
+): TransactionsFieldMapping | null => {
+  if (!database) {
+    return mapping;
+  }
+
+  if (mapping && validateTransactionsFieldMapping(mapping, database).length === 0) {
+    return mapping;
+  }
+
+  return suggestTransactionsFieldMapping(database);
+};
+
 Alpine.data('popup', () => ({
   filteredAccts: [] as Account[],
   selectedAccounts: [] as string[],
   detectedTransactions: [] as Transaction[],
-  invertTransactionSigns: false,
   isLoading: false,
   error: '',
   syncResultMessage: '',
@@ -227,23 +230,41 @@ Alpine.data('popup', () => ({
     this.notionApiKey = settings.notionApiKey;
     this.balanceDatabase = settings.balanceDatabase;
     this.transactionsDatabase = settings.transactionsDatabase;
-    this.transactionsFieldMapping = settings.transactionsFieldMapping;
-    this.invertTransactionSigns = settings.invertTransactionSigns;
+    this.transactionsFieldMapping = resolveTransactionsFieldMapping(settings.transactionsFieldMapping, settings.transactionsDatabase);
     this.selectedAccounts = settings.selectedAccounts;
+
+    if (this.transactionsFieldMapping !== settings.transactionsFieldMapping) {
+      saveExtensionSettings({
+        transactionsFieldMapping: this.transactionsFieldMapping,
+      }).catch(() => {});
+    }
 
     chrome.storage.onChanged.addListener((changes, areaName) => {
       if (areaName !== 'local') {
         return;
       }
 
-      if (!changes.selectedAccounts && !changes.availableAccounts && !changes.invertTransactionSigns) {
+      if (
+        !changes.selectedAccounts &&
+        !changes.availableAccounts &&
+        !changes.balanceDatabase &&
+        !changes.transactionsDatabase &&
+        !changes.transactionsFieldMapping &&
+        !changes.notionApiKey
+      ) {
         return;
       }
 
       getExtensionSettings()
         .then((updatedSettings) => {
           this.selectedAccounts = updatedSettings.selectedAccounts;
-          this.invertTransactionSigns = updatedSettings.invertTransactionSigns;
+          this.notionApiKey = updatedSettings.notionApiKey;
+          this.balanceDatabase = updatedSettings.balanceDatabase;
+          this.transactionsDatabase = updatedSettings.transactionsDatabase;
+          this.transactionsFieldMapping = resolveTransactionsFieldMapping(
+            updatedSettings.transactionsFieldMapping,
+            updatedSettings.transactionsDatabase,
+          );
         })
         .catch(() => {});
     });
@@ -272,7 +293,7 @@ Alpine.data('popup', () => ({
       return 'Not connected';
     }
 
-    const mappingErrors = validateTransactionsFieldMapping(this.transactionsFieldMapping, this.transactionsDatabase);
+    const mappingErrors = validateTransactionsFieldMapping(this.resolvedTransactionsFieldMapping, this.transactionsDatabase);
     if (mappingErrors.length > 0) {
       return 'Mapping incomplete';
     }
@@ -293,7 +314,7 @@ Alpine.data('popup', () => ({
       return false;
     }
 
-    const mappingErrors = validateTransactionsFieldMapping(this.transactionsFieldMapping, this.transactionsDatabase);
+    const mappingErrors = validateTransactionsFieldMapping(this.resolvedTransactionsFieldMapping, this.transactionsDatabase);
     return mappingErrors.length === 0 && this.detectedTransactions.length > 0;
   },
   get syncDisabled() {
@@ -325,14 +346,17 @@ Alpine.data('popup', () => ({
   get transactionsDatabaseTitle() {
     return this.transactionsDatabase ? this.transactionsDatabase.title : 'Not connected';
   },
+  get resolvedTransactionsFieldMapping() {
+    return resolveTransactionsFieldMapping(this.transactionsFieldMapping, this.transactionsDatabase);
+  },
   get hasTransactionsPreview() {
     return this.detectedTransactions.length > 0;
   },
   get transactionsPreview() {
     return this.detectedTransactions.map((transaction: Transaction) => ({
       ...transaction,
-      previewAmountText: formatTransactionAmount(transaction, this.invertTransactionSigns),
-      previewDirectionText: getEffectiveTransactionAmount(transaction, this.invertTransactionSigns) < 0 ? 'Expense' : 'Income',
+      previewAmountText: formatTransactionAmount(transaction),
+      previewTypeText: getTransactionTypeLabel(transaction.type),
       accountTypeLabel: getTransactionAccountTypeLabel(transaction.accountType),
     }));
   },
@@ -416,11 +440,6 @@ Alpine.data('popup', () => ({
     this.error = '';
     this.syncResultMessage = '';
     chrome.runtime.openOptionsPage();
-  },
-  async onInvertTransactionSignsChange() {
-    await saveExtensionSettings({
-      invertTransactionSigns: this.invertTransactionSigns,
-    });
   },
   async onBalanceSelectionChange() {
     const selectedAccounts = this.filteredAccts
@@ -530,8 +549,9 @@ Alpine.data('popup', () => ({
       return;
     }
 
-    const mappingErrors = validateTransactionsFieldMapping(this.transactionsFieldMapping, this.transactionsDatabase);
-    if (mappingErrors.length > 0 || !this.transactionsFieldMapping) {
+    const initialMapping = this.resolvedTransactionsFieldMapping;
+    const mappingErrors = validateTransactionsFieldMapping(initialMapping, this.transactionsDatabase);
+    if (mappingErrors.length > 0 || !initialMapping) {
       this.error = mappingErrors[0] ?? 'Transactions field mapping is incomplete.';
       return;
     }
@@ -557,25 +577,31 @@ Alpine.data('popup', () => ({
     try {
       const transactionsDatabase = await refreshNotionDatabaseConnection(notion, this.transactionsDatabase, 'transactions');
       this.transactionsDatabase = transactionsDatabase;
+      this.transactionsFieldMapping = resolveTransactionsFieldMapping(this.transactionsFieldMapping, transactionsDatabase);
       await saveExtensionSettings({
         transactionsDatabase,
+        transactionsFieldMapping: this.transactionsFieldMapping,
       });
 
-      const refreshedMappingErrors = validateTransactionsFieldMapping(this.transactionsFieldMapping, transactionsDatabase);
+      const resolvedMapping = this.resolvedTransactionsFieldMapping;
+      const refreshedMappingErrors = validateTransactionsFieldMapping(resolvedMapping, transactionsDatabase);
       if (refreshedMappingErrors.length > 0) {
         this.error = refreshedMappingErrors[0];
         return;
       }
 
       const merchantProperty = transactionsDatabase.properties.find(
-        (property) => property.name === this.transactionsFieldMapping!.merchantProperty,
+        (property) => property.name === resolvedMapping!.merchantProperty,
+      );
+      const typeProperty = transactionsDatabase.properties.find(
+        (property) => property.name === resolvedMapping!.typeProperty,
       );
       const syncIdProperty = transactionsDatabase.properties.find(
         (property) => property.name === TRANSACTION_SYNC_ID_PROPERTY,
       );
 
-      if (!merchantProperty || !syncIdProperty) {
-        this.error = 'Transactions database is missing either the merchant field or the Sync ID field.';
+      if (!merchantProperty || !typeProperty || !syncIdProperty) {
+        this.error = 'Transactions database is missing the merchant field, type field, or Sync ID field.';
         return;
       }
 
@@ -595,7 +621,7 @@ Alpine.data('popup', () => ({
       const existingSyncIds = await getExistingTransactionSyncIds(
         notion,
         transactionsDatabase.dataSourceId!,
-        this.transactionsFieldMapping.dateProperty,
+        resolvedMapping!.dateProperty,
         transactionDateRange,
       );
 
@@ -619,22 +645,31 @@ Alpine.data('popup', () => ({
       await Promise.all(
         unsyncedTransactions.map(({ transaction, syncId }) => {
           const properties: NotionPageCreateProperties = {
-            [this.transactionsFieldMapping!.dateProperty]: {
+            [resolvedMapping!.dateProperty]: {
               type: 'date',
               date: {
                 start: transaction.date,
               },
             },
-            [this.transactionsFieldMapping!.amountProperty]: {
+            [resolvedMapping!.amountProperty]: {
               type: 'number',
-              number: getEffectiveTransactionAmount(transaction, this.invertTransactionSigns),
+              number: Math.abs(transaction.amountValue),
             },
-            [this.transactionsFieldMapping!.accountNameProperty]: toRichText(transaction.accountName),
+            [resolvedMapping!.accountNameProperty]: toRichText(transaction.accountName),
             [TRANSACTION_SYNC_ID_PROPERTY]: toRichText(syncId),
           };
 
-          properties[this.transactionsFieldMapping!.merchantProperty] =
+          properties[resolvedMapping!.merchantProperty] =
             merchantProperty.type === 'title' ? toTitle(transaction.merchant) : toRichText(transaction.merchant);
+          properties[resolvedMapping!.typeProperty] =
+            typeProperty.type === 'select'
+              ? {
+                  type: 'select',
+                  select: {
+                    name: transaction.type,
+                  },
+                }
+              : toRichText(transaction.type);
 
           return notion.pages.create({
             parent: {

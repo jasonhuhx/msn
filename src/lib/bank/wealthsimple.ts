@@ -298,11 +298,16 @@ const wealthsimpleExtractTransactions: InjectedPageFn<[], Transaction[]> = () =>
 
     return 'unknown';
   };
+  const inferTransactionType = (rawAmountValue: number): TransactionType => (rawAmountValue < 0 ? 'debit' : 'credit');
 
   const parseSignedAmount = (value: string): number => {
     const normalized = value.replace(/[−–]/g, '-');
     const parsed = parseFloat(normalized.replace(/[^0-9.-]+/g, ''));
     return Number.isNaN(parsed) ? 0 : parsed;
+  };
+  const getCurrencyCode = (value: string): string | null => {
+    const currencyMatch = value.match(/\b([A-Z]{3})\b/);
+    return currencyMatch?.[1] ?? null;
   };
 
   const parseTransactionDate = (value: string): string => {
@@ -426,15 +431,16 @@ const wealthsimpleExtractTransactions: InjectedPageFn<[], Transaction[]> = () =>
       const detail = contentTexts[1] ?? '';
       const accountName = accountLabel.includes('•') ? accountLabel.split('•').pop()?.trim() ?? accountLabel : accountLabel;
       const accountType = inferAccountType(accountLabel);
-      const amountValue = parseSignedAmount(amountText);
-      const direction = amountValue < 0 ? 'debit' : amountValue > 0 ? 'credit' : 'unknown';
+      const rawAmountValue = parseSignedAmount(amountText);
       const dateText = currentDateText || findNearestDateHeadingText(element);
 
       transactions.push({
         key: `${dateText}-${amountText}-${detail || merchant}-${index}`,
         date: parseTransactionDate(dateText),
         amountText,
-        amountValue,
+        amountValue: Math.abs(rawAmountValue),
+        rawAmountValue,
+        currencyCode: getCurrencyCode(amountText),
         cardProductName: accountName,
         merchant,
         description: detail || merchant,
@@ -442,7 +448,7 @@ const wealthsimpleExtractTransactions: InjectedPageFn<[], Transaction[]> = () =>
         cardLastFour: '',
         accountName,
         accountType,
-        direction,
+        type: inferTransactionType(rawAmountValue),
         category: detail,
       });
     });

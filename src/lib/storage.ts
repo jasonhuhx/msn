@@ -6,7 +6,6 @@ const STORAGE_KEYS = [
   'balanceDatabase',
   'transactionsDatabase',
   'transactionsFieldMapping',
-  'invertTransactionSigns',
   'balanceDatabaseLinkDraft',
   'transactionsDatabaseLinkDraft',
 ] as const;
@@ -49,7 +48,21 @@ const normalizeSelectedAccounts = (selectedAccounts: unknown): string[] => {
   return Array.from(new Set(selectedAccounts.filter((value): value is string => typeof value === 'string')));
 };
 
-const normalizeBoolean = (value: unknown, fallback = false): boolean => (typeof value === 'boolean' ? value : fallback);
+const normalizeTransactionsFieldMapping = (mapping: unknown): TransactionsFieldMapping | null => {
+  if (!mapping || typeof mapping !== 'object' || Array.isArray(mapping)) {
+    return null;
+  }
+
+  const candidate = mapping as Partial<TransactionsFieldMapping>;
+
+  return {
+    dateProperty: typeof candidate.dateProperty === 'string' ? candidate.dateProperty : '',
+    amountProperty: typeof candidate.amountProperty === 'string' ? candidate.amountProperty : '',
+    merchantProperty: typeof candidate.merchantProperty === 'string' ? candidate.merchantProperty : '',
+    accountNameProperty: typeof candidate.accountNameProperty === 'string' ? candidate.accountNameProperty : '',
+    typeProperty: typeof candidate.typeProperty === 'string' ? candidate.typeProperty : '',
+  };
+};
 
 const normalizeDatabaseProperties = (properties: unknown): DatabaseProperty[] => {
   if (Array.isArray(properties)) {
@@ -103,7 +116,6 @@ const EMPTY_SETTINGS: ExtensionSettings = {
   balanceDatabase: null,
   transactionsDatabase: null,
   transactionsFieldMapping: null,
-  invertTransactionSigns: false,
   balanceDatabaseLinkDraft: '',
   transactionsDatabaseLinkDraft: '',
 };
@@ -132,8 +144,7 @@ export const getExtensionSettings = async (): Promise<ExtensionSettings> => {
     notionApiKey: stored.notionApiKey ?? EMPTY_SETTINGS.notionApiKey,
     balanceDatabase,
     transactionsDatabase: normalizeDatabase(stored.transactionsDatabase ?? EMPTY_SETTINGS.transactionsDatabase),
-    transactionsFieldMapping: stored.transactionsFieldMapping ?? EMPTY_SETTINGS.transactionsFieldMapping,
-    invertTransactionSigns: normalizeBoolean(stored.invertTransactionSigns, EMPTY_SETTINGS.invertTransactionSigns),
+    transactionsFieldMapping: normalizeTransactionsFieldMapping(stored.transactionsFieldMapping) ?? EMPTY_SETTINGS.transactionsFieldMapping,
     balanceDatabaseLinkDraft: stored.balanceDatabaseLinkDraft ?? balanceDatabase?.link ?? EMPTY_SETTINGS.balanceDatabaseLinkDraft,
     transactionsDatabaseLinkDraft:
       stored.transactionsDatabaseLinkDraft ??

@@ -208,7 +208,7 @@
             <section class="rounded-3xl border border-stone-200 bg-stone-50 p-5">
               <div class="mb-4">
                 <h3 class="text-xl font-semibold dark:text-stone-500">Transactions Database</h3>
-                <p class="mt-1 text-stone-500">This database is separate from balance sync and stores credit card transaction rows.</p>
+                <p class="mt-1 text-stone-500">This database is separate from balance sync and stores normalized transaction rows.</p>
               </div>
 
               <label for="transactions-link" class="mb-2 block text-sm font-medium text-stone-700">Transactions Database Block Link</label>
@@ -348,6 +348,19 @@
                           >
                             <option value="">Select a rich_text field</option>
                             <template x-for="property in transactionsAccountNameOptions" :key="property.id">
+                              <option :value="property.name" :selected="property.selected" x-text="property.name"></option>
+                            </template>
+                          </select>
+                        </label>
+
+                        <label class="text-sm text-stone-700">
+                          <span class="mb-1 block font-medium">Type Field</span>
+                          <select
+                            @change="onTransactionsTypeChange"
+                            class="w-full rounded-xl border border-stone-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-lime-700 focus:ring-2 focus:ring-lime-700/20"
+                          >
+                            <option value="">Select a select field</option>
+                            <template x-for="property in transactionsTypeOptions" :key="property.id">
                               <option :value="property.name" :selected="property.selected" x-text="property.name"></option>
                             </template>
                           </select>

@@ -25,6 +25,7 @@ const emptyTransactionsFieldMapping = (): TransactionsFieldMapping => ({
   amountProperty: '',
   merchantProperty: '',
   accountNameProperty: '',
+  typeProperty: '',
 });
 
 const normalizeTransactionsFieldMapping = (mapping: TransactionsFieldMapping | null | undefined): TransactionsFieldMapping => ({
@@ -32,6 +33,7 @@ const normalizeTransactionsFieldMapping = (mapping: TransactionsFieldMapping | n
   amountProperty: mapping?.amountProperty ?? '',
   merchantProperty: mapping?.merchantProperty ?? '',
   accountNameProperty: mapping?.accountNameProperty ?? '',
+  typeProperty: mapping?.typeProperty ?? '',
 });
 
 const markSelectedOptions = (properties: DatabaseProperty[], selectedName: string): MappingOption[] =>
@@ -65,11 +67,13 @@ Alpine.data('accountOptions', () => ({
     'number -> Amount',
     'date -> Date',
     'rich_text -> Account Name',
+    'select -> Type',
   ],
   transactionsDateOptions: [] as MappingOption[],
   transactionsAmountOptions: [] as MappingOption[],
   transactionsMerchantOptions: [] as MappingOption[],
   transactionsAccountNameOptions: [] as MappingOption[],
+  transactionsTypeOptions: [] as MappingOption[],
   saveHintText: '',
   async init() {
     const settings = await getExtensionSettings();
@@ -264,6 +268,10 @@ Alpine.data('accountOptions', () => ({
       getCompatibleProperties(this.transactionsDatabase, ['rich_text']),
       this.transactionsFieldMapping.accountNameProperty,
     );
+    this.transactionsTypeOptions = markSelectedOptions(
+      getCompatibleProperties(this.transactionsDatabase, ['select']),
+      this.transactionsFieldMapping.typeProperty,
+    );
     this.transactionsMappingErrors = validateTransactionsFieldMapping(
       this.transactionsDatabase ? this.transactionsFieldMapping : null,
       this.transactionsDatabase,
@@ -373,6 +381,7 @@ Alpine.data('accountOptions', () => ({
     this.transactionsAmountOptions = [];
     this.transactionsMerchantOptions = [];
     this.transactionsAccountNameOptions = [];
+    this.transactionsTypeOptions = [];
     this.transactionsMappingErrors = [];
     saveExtensionSettings({
       transactionsDatabase: null,
@@ -411,6 +420,15 @@ Alpine.data('accountOptions', () => ({
   onTransactionsAccountNameChange(event: Event) {
     const target = event.target as HTMLSelectElement;
     this.transactionsFieldMapping.accountNameProperty = target.value;
+    this.refreshTransactionsMappingState();
+    this.refreshSaveHint();
+    saveExtensionSettings({
+      transactionsFieldMapping: Alpine.raw(this.transactionsFieldMapping),
+    }).catch(() => {});
+  },
+  onTransactionsTypeChange(event: Event) {
+    const target = event.target as HTMLSelectElement;
+    this.transactionsFieldMapping.typeProperty = target.value;
     this.refreshTransactionsMappingState();
     this.refreshSaveHint();
     saveExtensionSettings({
