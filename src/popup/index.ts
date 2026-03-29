@@ -2,7 +2,8 @@ import Alpine from '@alpinejs/csp';
 import { Client } from '@notionhq/client';
 
 import '../global.css';
-import { detectBankFromHost } from '../lib/bank';
+import { detectBankFromHost, getBankAdapterById } from '../lib/bank';
+import type { BankId } from '../lib/bank/type';
 import {
   createNotionClient,
   refreshNotionDatabaseConnection,
@@ -105,13 +106,24 @@ type NotionQueryPage = {
 
 type NotionPageCreateRequest = Parameters<Client['pages']['create']>[0];
 type NotionPageCreateProperties = NonNullable<NotionPageCreateRequest['properties']>;
+type BankAccountKey = string;
 type BalanceAccountsUpdateDetail = {
+  bankId: BankId;
   accounts: Account[];
   selectedAccountKeys: string[];
 };
+const BANK_ACCOUNT_KEY_SEPARATOR = '::';
+const toBankScopedAccountKey = (bankId: BankId, accountKey: string): BankAccountKey => `${bankId}${BANK_ACCOUNT_KEY_SEPARATOR}${accountKey}`;
+const isBankScopedAccountKey = (value: string, bankId: BankId): boolean => value.startsWith(`${bankId}${BANK_ACCOUNT_KEY_SEPARATOR}`);
+const fromBankScopedAccountKey = (value: string, bankId: BankId): string =>
+  isBankScopedAccountKey(value, bankId) ? value.slice(`${bankId}${BANK_ACCOUNT_KEY_SEPARATOR}`.length) : value;
 
 const getAccountSelectionKey = (account: Account): string => account.key?.trim() || account.name;
-const buildAvailableAccountsMap = (accounts: Account[]): Record<string, string> => {
+const getScopedAvailableAccountsForBank = (availableAccounts: Record<string, string>, bankId: BankId): Record<string, string> =>
+  Object.fromEntries(Object.entries(availableAccounts).filter(([key]) => isBankScopedAccountKey(key, bankId)));
+const getScopedSelectedAccountsForBank = (selectedAccounts: string[], bankId: BankId): string[] =>
+  selectedAccounts.filter((key) => isBankScopedAccountKey(key, bankId)).map((key) => fromBankScopedAccountKey(key, bankId));
+const buildAvailableAccountsMap = (accounts: Account[], bankId: BankId, bankLabel: string): Record<string, string> => {
   const nameCounts = accounts.reduce<Record<string, number>>((result, account) => {
     result[account.name] = (result[account.name] ?? 0) + 1;
     return result;
@@ -120,13 +132,15 @@ const buildAvailableAccountsMap = (accounts: Account[]): Record<string, string> 
   return Object.fromEntries(
     accounts.map((account) => {
       const isDuplicateName = (nameCounts[account.name] ?? 0) > 1;
-      const title = isDuplicateName ? `${account.name} (${account.balance})` : account.name;
-      return [getAccountSelectionKey(account), title];
+      const baseTitle = isDuplicateName ? `${account.name} (${account.balance})` : account.name;
+      return [toBankScopedAccountKey(bankId, getAccountSelectionKey(account)), `${bankLabel} • ${baseTitle}`];
     }),
   );
 };
-const matchesStoredAccountSelection = (account: Account, selectedAccounts: string[]): boolean =>
-  selectedAccounts.includes(getAccountSelectionKey(account)) || selectedAccounts.includes(account.name);
+const matchesStoredAccountSelection = (account: Account, selectedAccounts: string[], bankId: BankId): boolean =>
+  selectedAccounts.includes(toBankScopedAccountKey(bankId, getAccountSelectionKey(account))) ||
+  selectedAccounts.includes(getAccountSelectionKey(account)) ||
+  selectedAccounts.includes(account.name);
 
 const getTransactionsDateRange = (transactions: Transaction[]): { start: string; end: string } | null => {
   const dates = transactions
@@ -214,6 +228,7 @@ const resolveTransactionsFieldMapping = (
 Alpine.data('popup', () => ({
   filteredAccts: [] as Account[],
   selectedAccounts: [] as string[],
+  currentBankId: null as BankId | null,
   detectedTransactions: [] as Transaction[],
   isLoading: false,
   error: '',
@@ -231,7 +246,7 @@ Alpine.data('popup', () => ({
     this.balanceDatabase = settings.balanceDatabase;
     this.transactionsDatabase = settings.transactionsDatabase;
     this.transactionsFieldMapping = resolveTransactionsFieldMapping(settings.transactionsFieldMapping, settings.transactionsDatabase);
-    this.selectedAccounts = settings.selectedAccounts;
+    this.selectedAccounts = [];
 
     if (this.transactionsFieldMapping !== settings.transactionsFieldMapping) {
       saveExtensionSettings({
@@ -257,7 +272,7 @@ Alpine.data('popup', () => ({
 
       getExtensionSettings()
         .then((updatedSettings) => {
-          this.selectedAccounts = updatedSettings.selectedAccounts;
+          this.selectedAccounts = this.currentBankId ? getScopedSelectedAccountsForBank(updatedSettings.selectedAccounts, this.currentBankId) : [];
           this.notionApiKey = updatedSettings.notionApiKey;
           this.balanceDatabase = updatedSettings.balanceDatabase;
           this.transactionsDatabase = updatedSettings.transactionsDatabase;
@@ -422,6 +437,7 @@ Alpine.data('popup', () => ({
     this.isLoading = false;
     this.pageMode = 'balances';
     if (event.detail) {
+      this.currentBankId = event.detail.bankId;
       this.filteredAccts = event.detail.accounts;
       this.selectedAccounts = event.detail.selectedAccountKeys;
       this.detectedTransactions = [];
@@ -442,14 +458,35 @@ Alpine.data('popup', () => ({
     chrome.runtime.openOptionsPage();
   },
   async onBalanceSelectionChange() {
+    if (!this.currentBankId) {
+      return;
+    }
+
     const selectedAccounts = this.filteredAccts
       .map((account: Account) => getAccountSelectionKey(account))
       .filter((accountKey: string) => this.selectedAccounts.includes(accountKey));
 
+    const settings = await getExtensionSettings();
+    const currentBankScopedAccountKeys = this.filteredAccts.map((account: Account) => toBankScopedAccountKey(this.currentBankId!, getAccountSelectionKey(account)));
+    const mergedAvailableAccounts = Object.fromEntries(
+      Object.entries(settings.availableAccounts).filter(
+        ([key]) => !currentBankScopedAccountKeys.includes(key) && !this.filteredAccts.some((account: Account) => getAccountSelectionKey(account) === key),
+      ),
+    );
+    const mergedSelectedAccounts = settings.selectedAccounts.filter(
+      (key: string) =>
+        !currentBankScopedAccountKeys.includes(key) &&
+        !this.filteredAccts.some((account: Account) => getAccountSelectionKey(account) === key || account.name === key),
+    );
+    const currentBankLabel = getBankAdapterById(this.currentBankId)?.name ?? this.currentBankId.toUpperCase();
+
     this.selectedAccounts = selectedAccounts;
     await saveExtensionSettings({
-      availableAccounts: buildAvailableAccountsMap(this.filteredAccts),
-      selectedAccounts,
+      availableAccounts: {
+        ...mergedAvailableAccounts,
+        ...buildAvailableAccountsMap(this.filteredAccts, this.currentBankId, currentBankLabel),
+      },
+      selectedAccounts: [...mergedSelectedAccounts, ...selectedAccounts.map((accountKey: string) => toBankScopedAccountKey(this.currentBankId!, accountKey))],
     });
   },
   async onSync() {
@@ -794,6 +831,8 @@ const scanCurrentPage = () => {
             }
 
             const settings = await getExtensionSettings();
+            const scopedAvailableAccounts = getScopedAvailableAccountsForBank(settings.availableAccounts, bankAdapter.id);
+            const scopedSelectedAccounts = getScopedSelectedAccountsForBank(settings.selectedAccounts, bankAdapter.id);
             const allGroupKeys = Object.keys(availableAccounts);
             const legacySelectedGroupKeys = allGroupKeys.filter((groupKey) => settings.selectedAccounts.includes(groupKey));
 
@@ -818,24 +857,41 @@ const scanCurrentPage = () => {
 
                 const accountKeys = accounts.map((account) => getAccountSelectionKey(account));
                 const matchedSelectedAccountKeys = accounts
-                  .filter((account) => matchesStoredAccountSelection(account, settings.selectedAccounts))
+                  .filter((account) => matchesStoredAccountSelection(account, settings.selectedAccounts, bankAdapter.id))
                   .map((account) => getAccountSelectionKey(account));
                 const shouldDefaultToAllAccounts =
-                  settings.selectedAccounts.length === 0
-                    ? Object.keys(settings.availableAccounts).length === 0
-                    : matchedSelectedAccountKeys.length === 0 && legacySelectedGroupKeys.length === 0;
+                  scopedSelectedAccounts.length === 0 && legacySelectedGroupKeys.length === 0 && Object.keys(scopedAvailableAccounts).length === 0;
 
                 const finalizeAccountSelection = async (selectedAccountKeys: string[]) => {
                   const normalizedSelectedAccountKeys = accountKeys.filter((accountKey) => selectedAccountKeys.includes(accountKey));
+                  const scopedAccountKeys = accountKeys.map((accountKey) => toBankScopedAccountKey(bankAdapter.id, accountKey));
+                  const mergedAvailableAccounts = Object.fromEntries(
+                    Object.entries(settings.availableAccounts).filter(
+                      ([key]) => !scopedAccountKeys.includes(key) && !accountKeys.includes(key),
+                    ),
+                  );
+                  const mergedSelectedAccounts = settings.selectedAccounts.filter(
+                    (key) =>
+                      !scopedAccountKeys.includes(key) &&
+                      !accountKeys.includes(key) &&
+                      !accounts.some((account) => account.name === key),
+                  );
 
                   await saveExtensionSettings({
-                    availableAccounts: buildAvailableAccountsMap(accounts),
-                    selectedAccounts: normalizedSelectedAccountKeys,
+                    availableAccounts: {
+                      ...mergedAvailableAccounts,
+                      ...buildAvailableAccountsMap(accounts, bankAdapter.id, bankAdapter.name),
+                    },
+                    selectedAccounts: [
+                      ...mergedSelectedAccounts,
+                      ...normalizedSelectedAccountKeys.map((accountKey) => toBankScopedAccountKey(bankAdapter.id, accountKey)),
+                    ],
                   });
 
                   window.dispatchEvent(
                     new CustomEvent<BalanceAccountsUpdateDetail>('after-accounts-update', {
                       detail: {
+                        bankId: bankAdapter.id,
                         accounts,
                         selectedAccountKeys: normalizedSelectedAccountKeys,
                       },
